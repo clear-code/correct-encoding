@@ -5,7 +5,7 @@
   <RDF:Description RDF:about="urn:mozilla:install-manifest"
                    em:id="correct-encoding@clear-code.com"
                    em:name="Correct Encoding"
-                   em:version="1.0"
+                   em:version="2.0"
                    em:description="Corrects encoding information of the active message when it has attachments with different encoding. This is a workaround for the bug 715823."
                    em:creator="ClearCode Inc."
                    em:homepageURL="http://www.clear-code.com/"
