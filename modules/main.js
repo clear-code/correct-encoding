@@ -8,6 +8,35 @@ load('lib/textIO');
 const WINDOW_TYPE_MESSAGE = 'mail:messageWindow';
 const WINDOW_TYPE_3PANE   = 'mail:3pane';
 
+function extractCharsetFromContentType(aSource) {
+  var matched = aSource.match(/^content-type:.+\bcharset=([^\s;]+)/im);
+  if (matched)
+    return matched[1];
+  return null;
+}
+
+function splitParts(aSource) {
+  var source = aSource.replace(/(\ncontent-type:\s+multipart\/mixed\b.*)\n(\s+)/gi, '$1$2');
+  var boundary = source.match(/\ncontent-type:\s+multipart\/mixed.*\sboundary=(.+)/i);
+  if (boundary) {
+    boundary = boundary[1];
+    boundary = boundary.replace(/^\"([^\"]+)\"/, '$1');
+    boundary = boundary.replace(/^'([^']+)'/, '$1');
+    let sources = source.split(boundary);
+    return {
+      headers:       sources[0] + boundary + getHeadersPart(sources[1]),
+      plaintextBody: sources[1],
+      attachedBody:  sources[2],
+      attachments:   sources.slice(3)
+    };
+  }
+  return null;
+}
+
+function getHeadersPart(aSource) {
+  return aSource.split('\n\n')[0];
+}
+
 function onMessageLoad(aEvent) {
   var win = aEvent.currentTarget.ownerDocument.defaultView;
   var msgWindow = win.msgWindow;
@@ -18,10 +47,23 @@ function onMessageLoad(aEvent) {
   var uri = IOService.newURI(content.location.href, null, null);
   var source = textIO.readFrom(uri);
 
-  // I guess the first encoding information as the one for the message body.
-  var matched = source.match(/^content-type:.+\bcharset=([^\s;]+)/im);
-  if (matched)
-    msgWindow.mailCharacterSet = matched[1];
+  var parts = splitParts(source);
+  if (parts) {
+    let charsetFromHeader = extractCharsetFromContentType(parts.headers);
+    dump('charsetFromHeader: '+charsetFromHeader+'\n');
+    if (charsetFromHeader)
+      return msgWindow.mailCharacterSet = charsetFromHeader;
+
+    let charsetFromAttachedBodyHeader = extractCharsetFromContentType(getHeadersPart(parts.attachedBody));
+    dump('charsetFromAttachedBodyHeader: '+charsetFromAttachedBodyHeader+'\n');
+    if (charsetFromAttachedBodyHeader)
+      return msgWindow.mailCharacterSet = charsetFromAttachedBodyHeader;
+  }
+
+  var firstCharsetFromHeaders = extractCharsetFromContentType(source);
+  dump('firstCharsetFromHeaders: '+firstCharsetFromHeaders+'\n');
+  if (firstCharsetFromHeaders)
+    msgWindow.mailCharacterSet = firstCharsetFromHeaders;
 }
 
 function handleWindow(aWindow) {
