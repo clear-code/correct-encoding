@@ -5,6 +5,8 @@
 load('lib/WindowManager');
 load('lib/textIO');
 
+var { Promise } = Cu.import('resource://gre/modules/Promise.jsm', {});
+
 const WINDOW_TYPE_MESSAGE = 'mail:messageWindow';
 const WINDOW_TYPE_3PANE   = 'mail:3pane';
 
@@ -15,8 +17,16 @@ function extractCharsetFromContentType(aSource) {
   return null;
 }
 
+function extractContentType(aSource) {
+  var matched = aSource.match(/^content-type:\s+([^;\s]+)/i);
+  if (matched)
+    return matched[1];
+  return null;
+}
+
 function splitParts(aSource) {
-  var source = aSource.replace(/(\ncontent-type:\s+multipart\/mixed\b.*)\n(\s+)/gi, '$1$2');
+  var source = aSource.replace(/(\ncontent-type:\s+multipart\/mixed[^\r\n]*)\r?\n(\s+)/gi, '$1$2');
+  // dump('MODIFIED BODY: \n'+source+'\n');
   var boundary = source.match(/\ncontent-type:\s+multipart\/mixed.*\sboundary=(.+)/i);
   if (boundary) {
     boundary = boundary[1];
@@ -37,6 +47,97 @@ function getHeadersPart(aSource) {
   return aSource.split('\n\n')[0];
 }
 
+function detectCharsetByBrowser(aDocument, aSource) {
+  var browser = aDocument.createElement('browser');
+  browser.setAttribute('type', 'content');
+  browser.setAttribute('style', 'visibility: collapse !important');
+  aDocument.documentElement.appendChild(browser);
+  try {
+    var contentType = extractContentType(aSource);
+    var uri = 'data:' + (contentType || 'text/plain') + ',' + escape(aSource);
+    return new Promise(function(aResolve, aReject) {
+      browser.addEventListener('load', function onLoad() {
+        browser.removeEventListener('load', onLoad, true);
+        var charset = browser.contentDocument.characterSet;
+        // dump('BROWSER CHARSET: '+charset+'\n');
+        aDocument.documentElement.removeChild(browser);
+        if (charset)
+          aResolve(charset);
+        else
+          aReject(new Error('no charset detected'));
+      }, true);
+      browser.loadURI(uri);
+    });
+  }
+  catch(error) {
+    Cu.reportError(error);
+    aDocument.documentElement.removeChild(browser);
+    return Promise.reject(error);
+  }
+}
+
+
+function trySetCharsetFromHeader(aMsgWindow, aParts) {
+  if (!aParts)
+    return Promise.reject(new Error('no parts'));
+
+  var charset = extractCharsetFromContentType(aParts.headers);
+  if (charset) {
+    aMsgWindow.mailCharacterSet = charset;
+    return Promise.resolve(charset);
+  }
+  return Promise.reject(new Error('no charset information in headers'));
+}
+
+function trySetCharsetAttachedBodyHeader(aMsgWindow, aParts) {
+  if (!aParts)
+    return Promise.reject(new Error('no parts'));
+
+  var charset = extractCharsetFromContentType(getHeadersPart(aParts.attachedBody));
+  if (charset) {
+    aMsgWindow.mailCharacterSet = charset;
+    return Promise.resolve(charset);
+  }
+  return Promise.reject(new Error('no charset information in attached body header'));
+}
+
+function trySetCharsetFromAttachedBody(aMsgWindow, aParts, aDocument) {
+  if (!aParts)
+    return Promise.reject(new Error('no parts'));
+
+  return detectCharsetByBrowser(aDocument, aParts.attachedBody)
+           .then(function(aCharset) {
+             aMsgWindow.mailCharacterSet = aCharset;
+             return aCharset;
+           })
+           .catch(function(aError) {
+             throw new Error('failed to detect charset from attached body');
+           });
+}
+
+function trySetCharsetFromPlaintextBody(aMsgWindow, aParts, aDocument) {
+  if (!aParts)
+    return Promise.reject(new Error('no parts'));
+
+  return detectCharsetByBrowser(aDocument, aParts.plaintextBody)
+           .then(function(aCharset) {
+             aMsgWindow.mailCharacterSet = aCharset;
+             return aCharset;
+           })
+           .catch(function(aError) {
+             throw new Error('failed to detect charset from plaintext body');
+           });
+}
+
+function trySetCharsetFromFirstGuessedCharset(aMsgWindow, aSoruce) {
+  var charset = extractCharsetFromContentType(aSoruce);
+  if (charset) {
+    aMsgWindow.mailCharacterSet = charset;
+    return Promise.resolve(charset);
+  }
+  return Promise.reject(new Error('no charset information in whole source'));
+}
+
 function onMessageLoad(aEvent) {
   var win = aEvent.currentTarget.ownerDocument.defaultView;
   var msgWindow = win.msgWindow;
@@ -48,22 +149,28 @@ function onMessageLoad(aEvent) {
   var source = textIO.readFrom(uri);
 
   var parts = splitParts(source);
-  if (parts) {
-    let charsetFromHeader = extractCharsetFromContentType(parts.headers);
-    dump('charsetFromHeader: '+charsetFromHeader+'\n');
-    if (charsetFromHeader)
-      return msgWindow.mailCharacterSet = charsetFromHeader;
-
-    let charsetFromAttachedBodyHeader = extractCharsetFromContentType(getHeadersPart(parts.attachedBody));
-    dump('charsetFromAttachedBodyHeader: '+charsetFromAttachedBodyHeader+'\n');
-    if (charsetFromAttachedBodyHeader)
-      return msgWindow.mailCharacterSet = charsetFromAttachedBodyHeader;
-  }
-
-  var firstCharsetFromHeaders = extractCharsetFromContentType(source);
-  dump('firstCharsetFromHeaders: '+firstCharsetFromHeaders+'\n');
-  if (firstCharsetFromHeaders)
-    msgWindow.mailCharacterSet = firstCharsetFromHeaders;
+  trySetCharsetFromHeader(msgWindow, parts)
+    .then(function(aCharset) { dump('trySetCharsetFromHeader: ' + aCharset + '\n'); })
+    .catch(function() {
+      return trySetCharsetAttachedBodyHeader(msgWindow, parts)
+               .then(function(aCharset) { dump('trySetCharsetAttachedBodyHeader: ' + aCharset + '\n'); });
+    })
+    .catch(function() {
+      return trySetCharsetFromAttachedBody(msgWindow, parts, win.document)
+               .then(function(aCharset) { dump('trySetCharsetFromAttachedBody: ' + aCharset + '\n'); });
+    })
+    .catch(function() {
+      return trySetCharsetFromPlaintextBody(msgWindow, parts, win.document)
+               .then(function(aCharset) { dump('trySetCharsetFromPlaintextBody: ' + aCharset + '\n'); });
+    })
+    .catch(function(aError) {
+      return trySetCharsetFromFirstGuessedCharset(msgWindow, source)
+               .then(function(aCharset) { dump('trySetCharsetFromFirstGuessedCharset: ' + aCharset + '\n'); });
+    })
+    .catch(function(aError) {
+      Cu.reportError(aError);
+      dump('failed to detect charset: ' + aError + '\n');
+    });
 }
 
 function handleWindow(aWindow) {
