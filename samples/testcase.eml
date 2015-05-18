@@ -1,0 +1,33 @@
+From - Tue Dec 03 17:35:20 2013
+Return-Path: <shimoda.clear.code@gmail.com>
+Received: from [192.168.1.23] (17.113.236.133.dy.bbexcite.jp. [133.236.113.17])
+        by mx.google.com with ESMTPSA id ja5sm30539363pbc.14.2013.12.16.20.53.08
+        for <shimoda.clear.code@gmail.com>
+        (version=TLSv1 cipher=ECDHE-RSA-RC4-SHA bits=128/128);
+        Mon, 16 Dec 2013 20:53:09 -0800 (PST)
+Message-ID: <52AFD8B4.7010407@gmail.com>
+Date: Tue, 17 Dec 2013 13:53:08 +0900
+From: "shimoda.clear.code" <shimoda.clear.code@gmail.com>
+User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:17.0) Gecko/20131028 Thunderbird/17.0.10
+MIME-Version: 1.0
+To: shimoda.clear.code@gmail.com
+Subject: =?ISO-2022-JP?B?GyRCS1xKOBsoQklTTzIwMjJKUBskQiEiRTpJVRsoQlNKSVM=?=
+Content-Type: multipart/mixed;
+ boundary="------------040708000901020000000407"
+
+This is a multi-part message in MIME format.
+--------------040708000901020000000407
+Content-Type: text/plain
+Content-Transfer-Encoding: 7bit
+
+本文ISO2022JP、添付SJIS
+
+--------------040708000901020000000407
+Content-Type: text/plain; charset=windows-1252;
+ name="sjis.txt"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment;
+ filename="sjis.txt"
+
+k/qWe4zqgsmC2YLxgrKDaoN6g5ODUw0KU2hpZnRfSklTgsWCtw0K
+--------------040708000901020000000407--
