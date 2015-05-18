@@ -19,7 +19,7 @@ function onMessageLoad(aEvent) {
   var source = textIO.readFrom(uri);
 
   // I guess the first encoding information as the one for the message body.
-  var matched = source.match(/^content-type:.+\bcharset=([^\s]+)/im);
+  var matched = source.match(/^content-type:.+\bcharset=([^\s;]+)/im);
   if (matched)
     msgWindow.mailCharacterSet = matched[1];
 }
