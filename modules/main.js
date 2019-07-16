@@ -6,9 +6,14 @@ load('lib/WindowManager');
 load('lib/textIO');
 
 var { Promise } = Cu.import('resource://gre/modules/Promise.jsm', {});
+var { Services } = Cu.import('resource://gre/modules/Services.jsm', {});
 
 const WINDOW_TYPE_MESSAGE = 'mail:messageWindow';
 const WINDOW_TYPE_3PANE   = 'mail:3pane';
+
+function dump(message) {
+  Services.console.logStringMessage(message);
+}
 
 function extractCharsetFromContentType(aSource) {
   var matched = aSource.match(/^content-type:.+\bcharset=([^\s;]+)/im);
