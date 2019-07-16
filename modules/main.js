@@ -16,9 +16,9 @@ function dump(...messages) {
 }
 
 function extractCharsetFromContentType(aSource) {
-  var matched = aSource.match(/^content-type:.+\bcharset=([^\s;]+)/im);
+  var matched = aSource.match(/(?:^|\r|\n)content-type:[^;]+;[\s]*\bcharset=([^\s;]+)/i);
   if (matched)
-    return matched[1];
+    return matched[1].replace(/^"(.+)"$/, '$1').replace(/^'(.+)'$/, '$1');
   return null;
 }
 
