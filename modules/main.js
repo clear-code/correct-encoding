@@ -11,8 +11,8 @@ var { Services } = Cu.import('resource://gre/modules/Services.jsm', {});
 const WINDOW_TYPE_MESSAGE = 'mail:messageWindow';
 const WINDOW_TYPE_3PANE   = 'mail:3pane';
 
-function dump(message) {
-  Services.console.logStringMessage(message);
+function dump(...messages) {
+  Services.console.logStringMessage(messages.join('\n'));
 }
 
 function extractCharsetFromContentType(aSource) {
